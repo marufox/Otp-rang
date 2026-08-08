@@ -10,11 +10,11 @@ from datetime import datetime
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 OWNER_ID = int(os.environ.get("OWNER_ID", 0))
-API_BASE = os.environ.get("API_URL", "https://api.2009.cloud/HXS47FLFX80U/tnews/@public/api")
+API_BASE = os.environ.get("API_URL", "https://api.2oo9.cloud/MXS47FLFX0U/tnevs/@public/api")
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ================= 💎 PREMIUM EMOJIS =================
+# ================= 💎 PREMIUM FLAG EMOJIS (From Your File) =================
 
 FLAG_EMOJIS = {
     "1": {"emoji": "🇺🇸", "id": "5913463998522592692"},
@@ -199,6 +199,8 @@ FLAG_EMOJIS = {
     "998": {"emoji": "🇺🇿", "id": "5911051846104912282"}
 }
 
+# ================= 💎 PREMIUM APP EMOJIS (From Your File) =================
+
 APP_EMOJIS = {
     "facebook": {"emoji": "📘", "id": "5334807341109908955"},
     "whatsapp": {"emoji": "💬", "id": "5334759662677957452"},
@@ -274,16 +276,12 @@ def get_country_from_number(number):
 
 def extract_otp(msg):
     match = re.search(r'\b\d{4,8}\b', msg)
-    if match:
-        return match.group()
-    return "******"
+    return match.group() if match else "******"
 
 def mask_number(num):
-    if len(num) > 7:
-        return num[:3] + "xxxx" + num[-4:]
-    return num
+    return num[:3] + "xxxx" + num[-4:] if len(num) > 7 else num
 
-# ================= 📩 FORMAT =================
+# ================= 📩 FORMAT (Number Bot Style - Exactly Like SS) =================
 
 def format_otp_message(number, service_name, service_emoji, service_id, otp_code):
     masked = mask_number(number)
@@ -308,27 +306,24 @@ def format_otp_message(number, service_name, service_emoji, service_id, otp_code
 
 def fetch_otps():
     try:
-        res = requests.get(f"{API_BASE}/console", timeout=5)  # ← GLOBAL OTP
+        res = requests.get(f"{API_BASE}/console", timeout=10)
         data = res.json()
         if data.get("meta", {}).get("code") == 208:
             return data.get("data", {}).get("hits", [])
-    except:
-        pass
+    except Exception as e:
+        print(f"API Error: {e}")
     return []
 
 # ================= 🧵 CACHE =================
 
 last_otps = set()
-subscribed_users = set()
+group_chat_ids = set()
 
-# ================= 🤖 USER BOT =================
+# ================= 🤖 BOT COMMANDS =================
 
 @bot.message_handler(commands=['start'])
 def start(m):
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.row("📡 Live OTP", "🔔 Subscribe")
-    kb.row("🔕 Unsubscribe", "ℹ️ Help")
-    bot.send_message(m.chat.id, f"""⭐ <b>OTP Live Monitor</b> ⭐
+    bot.send_message(m.chat.id, """⭐ <b>OTP Live Monitor</b> ⭐
 
 👋 Welcome!
 
@@ -336,60 +331,93 @@ def start(m):
 🔹 All services supported
 🔹 Premium emoji design
 
-📍 Select an option below
-
-🛡 <b>Secure • Fast • Reliable</b>""", reply_markup=kb, parse_mode="HTML")
-
-@bot.message_handler(func=lambda m: m.text == "📡 Live OTP")
-def live_otp(m):
-    otps = fetch_otps()
-    if not otps:
-        bot.send_message(m.chat.id, f"❌ No OTPs found!")
-        return
-    for otp in otps[:3]:
-        num = otp.get("range", "N/A")
-        sid = otp.get("sid", "Unknown")
-        msg_text = otp.get("message", "")
-        service_name, service_emoji, service_id = detect_service(sid)
-        otp_code = extract_otp(msg_text)
-        formatted = format_otp_message(num, service_name, service_emoji, service_id, otp_code)
-        
-        kb = types.InlineKeyboardMarkup(row_width=2)
-        kb.add(types.InlineKeyboardButton(f"📋 Copy {otp_code}", copy_text={"text": otp_code}))
-        kb.add(types.InlineKeyboardButton("📱 Get Number", url="https://t.me/MX_Number1_Bot"))
-        kb.add(types.InlineKeyboardButton("🆘 Support", url="https://t.me/max_supportar"))
-        
-        bot.send_message(m.chat.id, formatted, reply_markup=kb, parse_mode="HTML")
-        time.sleep(0.5)
-
-@bot.message_handler(func=lambda m: m.text == "🔔 Subscribe")
-def subscribe(m):
-    subscribed_users.add(m.chat.id)
-    bot.send_message(m.chat.id, f"✅ Subscribed to live OTP updates!")
-
-@bot.message_handler(func=lambda m: m.text == "🔕 Unsubscribe")
-def unsubscribe(m):
-    subscribed_users.discard(m.chat.id)
-    bot.send_message(m.chat.id, f"❌ Unsubscribed.")
-
-@bot.message_handler(func=lambda m: m.text == "ℹ️ Help")
-def help_cmd(m):
-    bot.send_message(m.chat.id, f"""💬 <b>Help</b>
-
-🔹 <b>Live OTP</b> – Global OTP দেখুন
-🔹 <b>Subscribe</b> – নতুন OTP এলে নোটিফিকেশন
-🔹 <b>Unsubscribe</b> – নোটিফিকেশন বন্ধ
+📌 <b>Add me to your group</b> and I will send OTP updates!
 
 🛡 <b>Secure • Fast • Reliable</b>""", parse_mode="HTML")
+
+@bot.message_handler(commands=['add_group'])
+def add_group(m):
+    if m.from_user.id != OWNER_ID:
+        bot.send_message(m.chat.id, "❌ Unauthorized!")
+        return
+    if m.chat.type in ['group', 'supergroup']:
+        group_chat_ids.add(m.chat.id)
+        bot.send_message(m.chat.id, f"✅ This group has been added for OTP updates!")
+    else:
+        bot.send_message(m.chat.id, "❌ This is not a group! Please run this command in a group.")
+
+@bot.message_handler(commands=['remove_group'])
+def remove_group(m):
+    if m.from_user.id != OWNER_ID:
+        bot.send_message(m.chat.id, "❌ Unauthorized!")
+        return
+    if m.chat.id in group_chat_ids:
+        group_chat_ids.discard(m.chat.id)
+        bot.send_message(m.chat.id, f"✅ This group has been removed from OTP updates.")
+    else:
+        bot.send_message(m.chat.id, "❌ This group is not in the list.")
+
+@bot.message_handler(commands=['list_groups'])
+def list_groups(m):
+    if m.from_user.id != OWNER_ID:
+        bot.send_message(m.chat.id, "❌ Unauthorized!")
+        return
+    if not group_chat_ids:
+        bot.send_message(m.chat.id, "📭 No groups added yet.")
+        return
+    msg = "📋 <b>Active Groups:</b>\n"
+    for gid in group_chat_ids:
+        msg += f"🔹 {gid}\n"
+    bot.send_message(m.chat.id, msg, parse_mode="HTML")
 
 @bot.message_handler(commands=['admin'])
 def admin(m):
     if m.from_user.id != OWNER_ID:
-        bot.send_message(m.chat.id, f"❌ Unauthorized!")
+        bot.send_message(m.chat.id, "❌ Unauthorized!")
         return
-    bot.send_message(m.chat.id, f"👑 <b>Admin</b>\n\n👥 Subscribers: {len(subscribed_users)}", parse_mode="HTML")
+    bot.send_message(m.chat.id, f"""👑 <b>Admin Panel</b>
 
-# ================= 🔄 MONITOR =================
+📊 <b>Statistics:</b>
+👥 Groups: {len(group_chat_ids)}
+🔄 Last OTPs: {len(last_otps)}
+
+📌 <b>Commands:</b>
+/add_group - Add current group
+/remove_group - Remove current group
+/list_groups - List all groups
+/live - Show live OTPs""", parse_mode="HTML")
+
+@bot.message_handler(commands=['live'])
+def live_otp_cmd(m):
+    if m.from_user.id != OWNER_ID:
+        bot.send_message(m.chat.id, "❌ Unauthorized!")
+        return
+    otps = fetch_otps()
+    if not otps:
+        bot.send_message(m.chat.id, "❌ No OTPs found!")
+        return
+    for otp in otps[:10]:
+        range_num = otp.get("range", "N/A")
+        sid = otp.get("sid", "Unknown")
+        msg_text = otp.get("message", "")
+        service_name, service_emoji, service_id = detect_service(sid)
+        otp_code = extract_otp(msg_text)
+        
+        formatted = format_otp_message(range_num, service_name, service_emoji, service_id, otp_code)
+        
+        kb = types.InlineKeyboardMarkup(row_width=2)
+        kb.add(
+            types.InlineKeyboardButton(f"📋 Copy {otp_code}", copy_text={"text": otp_code}),
+            types.InlineKeyboardButton("📱 Get Number", url="https://t.me/MX_Number1_Bot")
+        )
+        kb.add(
+            types.InlineKeyboardButton("🆘 Support", url="https://t.me/max_supportar")
+        )
+        
+        bot.send_message(m.chat.id, formatted, reply_markup=kb, parse_mode="HTML")
+        time.sleep(0.5)
+
+# ================= 🔄 OTP MONITOR THREAD =================
 
 def otp_monitor():
     while True:
@@ -403,30 +431,44 @@ def otp_monitor():
                 if len(last_otps) > 300:
                     last_otps.clear()
 
-                num = otp.get("range", "N/A")
+                range_num = otp.get("range", "N/A")
                 sid = otp.get("sid", "Unknown")
                 msg_text = otp.get("message", "")
                 service_name, service_emoji, service_id = detect_service(sid)
                 otp_code = extract_otp(msg_text)
-                formatted = format_otp_message(num, service_name, service_emoji, service_id, otp_code)
-
+                
+                formatted = format_otp_message(range_num, service_name, service_emoji, service_id, otp_code)
+                
                 kb = types.InlineKeyboardMarkup(row_width=2)
-                kb.add(types.InlineKeyboardButton(f"📋 Copy {otp_code}", copy_text={"text": otp_code}))
-                kb.add(types.InlineKeyboardButton("📱 Get Number", url="https://t.me/MX_Number1_Bot"))
-                kb.add(types.InlineKeyboardButton("🆘 Support", url="https://t.me/max_supportar"))
+                kb.add(
+                    types.InlineKeyboardButton(f"📋 Copy {otp_code}", copy_text={"text": otp_code}),
+                    types.InlineKeyboardButton("📱 Get Number", url="https://t.me/MX_Number1_Bot")
+                )
+                kb.add(
+                    types.InlineKeyboardButton("🆘 Support", url="https://t.me/max_supportar")
+                )
 
-                for uid in list(subscribed_users):
+                for gid in list(group_chat_ids):
                     try:
-                        bot.send_message(uid, formatted, reply_markup=kb, parse_mode="HTML")
-                    except:
-                        pass
-        except:
-            pass
-        time.sleep(3)
+                        bot.send_message(gid, formatted, reply_markup=kb, parse_mode="HTML")
+                    except Exception as e:
+                        print(f"Failed to send to group {gid}: {e}")
+                        if "chat not found" in str(e) or "bot is not a member" in str(e):
+                            group_chat_ids.discard(gid)
+        except Exception as e:
+            print(f"Monitor Error: {e}")
+        time.sleep(5)
 
 # ================= 🚀 START =================
 
 if __name__ == "__main__":
     print("🚀 Global OTP Monitor Started...")
+    print("📌 Commands:")
+    print("  /start - Welcome message")
+    print("  /admin - Admin panel")
+    print("  /add_group - Add current group")
+    print("  /remove_group - Remove current group")
+    print("  /list_groups - List all groups")
+    print("  /live - Show live OTPs")
     threading.Thread(target=otp_monitor, daemon=True).start()
     bot.infinity_polling()
