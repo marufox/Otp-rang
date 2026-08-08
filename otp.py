@@ -14,7 +14,7 @@ API_BASE = os.environ.get("API_URL", "https://api.2009.cloud/HXS47FLFX80U/tnews/
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ================= 💎 PREMIUM EMOJIS (From Your Files) =================
+# ================= 💎 PREMIUM EMOJIS =================
 
 FLAG_EMOJIS = {
     "1": {"emoji": "🇺🇸", "id": "5913463998522592692"},
@@ -257,7 +257,7 @@ APP_EMOJIS = {
     "duolingo": {"emoji": "🗣️", "id": "5336879280578138635"}
 }
 
-# ================= 🔍 DETECT SERVICE & COUNTRY =================
+# ================= 🔍 DETECT =================
 
 def detect_service(msg):
     msg = msg.lower()
@@ -272,18 +272,21 @@ def get_country_from_number(number):
             return data["emoji"], data["id"]
     return "🌍", None
 
-# ================= 🧾 EXTRACT OTP =================
-
 def extract_otp(msg):
     match = re.search(r'\b\d{4,8}\b', msg)
     if match:
         return match.group()
     return "******"
 
-# ================= 📩 FORMAT OTP MESSAGE =================
+def mask_number(num):
+    if len(num) > 7:
+        return num[:3] + "xxxx" + num[-4:]
+    return num
+
+# ================= 📩 FORMAT =================
 
 def format_otp_message(number, service_name, service_emoji, service_id, otp_code):
-    masked = number[:3] + "xxxx" + number[-4:] if len(number) > 7 else number
+    masked = mask_number(number)
     flag_emoji, flag_id = get_country_from_number(number)
     
     service_tag = f'<tg-emoji emoji-id="{service_id}">{service_emoji}</tg-emoji>' if service_id else service_emoji
@@ -301,22 +304,22 @@ def format_otp_message(number, service_name, service_emoji, service_id, otp_code
 ⚠️ <i>Please don't share this code with anyone!</i>
 🛡 <b>Secure • Fast • Reliable</b>"""
 
+# ================= 📡 API (GLOBAL OTP) =================
+
+def fetch_otps():
+    try:
+        res = requests.get(f"{API_BASE}/console", timeout=5)  # ← GLOBAL OTP
+        data = res.json()
+        if data.get("meta", {}).get("code") == 208:
+            return data.get("data", {}).get("hits", [])
+    except:
+        pass
+    return []
+
 # ================= 🧵 CACHE =================
 
 last_otps = set()
 subscribed_users = set()
-
-# ================= 📡 API CALLS =================
-
-def fetch_otps():
-    try:
-        res = requests.get(f"{API_BASE}/success-otp", timeout=5)
-        data = res.json()
-        if data.get("meta", {}).get("code") == 208:
-            return data.get("data", {}).get("otps", [])
-    except:
-        pass
-    return []
 
 # ================= 🤖 USER BOT =================
 
@@ -327,13 +330,13 @@ def start(m):
     kb.row("🔕 Unsubscribe", "ℹ️ Help")
     bot.send_message(m.chat.id, f"""⭐ <b>OTP Live Monitor</b> ⭐
 
-👋 Welcome to OTP Live Monitor Bot!
+👋 Welcome!
 
-🔹 Get real-time OTP notifications
-🔹 Support for all services
+🔹 Real-time global OTP notifications
+🔹 All services supported
 🔹 Premium emoji design
 
-📍 <b>Select an option below</b>
+📍 Select an option below
 
 🛡 <b>Secure • Fast • Reliable</b>""", reply_markup=kb, parse_mode="HTML")
 
@@ -344,14 +347,15 @@ def live_otp(m):
         bot.send_message(m.chat.id, f"❌ No OTPs found!")
         return
     for otp in otps[:3]:
-        num = otp.get("number", "N/A")
+        num = otp.get("range", "N/A")
+        sid = otp.get("sid", "Unknown")
         msg_text = otp.get("message", "")
-        service_name, service_emoji, service_id = detect_service(msg_text)
+        service_name, service_emoji, service_id = detect_service(sid)
         otp_code = extract_otp(msg_text)
         formatted = format_otp_message(num, service_name, service_emoji, service_id, otp_code)
         
         kb = types.InlineKeyboardMarkup(row_width=2)
-        kb.add(types.InlineKeyboardButton(f"📋 Copy {otp_code}", copy_text={"text": otp_code}, callback_data="copy_otp"))
+        kb.add(types.InlineKeyboardButton(f"📋 Copy {otp_code}", copy_text={"text": otp_code}))
         kb.add(types.InlineKeyboardButton("📱 Get Number", url="https://t.me/MX_Number1_Bot"))
         kb.add(types.InlineKeyboardButton("🆘 Support", url="https://t.me/max_supportar"))
         
@@ -361,49 +365,48 @@ def live_otp(m):
 @bot.message_handler(func=lambda m: m.text == "🔔 Subscribe")
 def subscribe(m):
     subscribed_users.add(m.chat.id)
-    bot.send_message(m.chat.id, f"✅ You are now subscribed to live OTP updates!")
+    bot.send_message(m.chat.id, f"✅ Subscribed to live OTP updates!")
 
 @bot.message_handler(func=lambda m: m.text == "🔕 Unsubscribe")
 def unsubscribe(m):
     subscribed_users.discard(m.chat.id)
-    bot.send_message(m.chat.id, f"❌ You have unsubscribed.")
+    bot.send_message(m.chat.id, f"❌ Unsubscribed.")
 
 @bot.message_handler(func=lambda m: m.text == "ℹ️ Help")
 def help_cmd(m):
     bot.send_message(m.chat.id, f"""💬 <b>Help</b>
 
-🔹 <b>Live OTP</b> – দেখুন আপনার লেটেস্ট OTP
-🔹 <b>Subscribe</b> – নতুন OTP এলে নোটিফিকেশন পাবেন
-🔹 <b>Unsubscribe</b> – নোটিফিকেশন বন্ধ করুন
+🔹 <b>Live OTP</b> – Global OTP দেখুন
+🔹 <b>Subscribe</b> – নতুন OTP এলে নোটিফিকেশন
+🔹 <b>Unsubscribe</b> – নোটিফিকেশন বন্ধ
 
 🛡 <b>Secure • Fast • Reliable</b>""", parse_mode="HTML")
-
-# ================= 👑 ADMIN =================
 
 @bot.message_handler(commands=['admin'])
 def admin(m):
     if m.from_user.id != OWNER_ID:
         bot.send_message(m.chat.id, f"❌ Unauthorized!")
         return
-    bot.send_message(m.chat.id, f"👑 <b>Admin Panel</b>\n\n👥 Subscribers: {len(subscribed_users)}", parse_mode="HTML")
+    bot.send_message(m.chat.id, f"👑 <b>Admin</b>\n\n👥 Subscribers: {len(subscribed_users)}", parse_mode="HTML")
 
-# ================= 🔄 OTP MONITOR THREAD =================
+# ================= 🔄 MONITOR =================
 
 def otp_monitor():
     while True:
         try:
             otps = fetch_otps()
             for otp in otps:
-                otp_id = otp.get("otp_id", "")
+                otp_id = str(otp.get("time", "")) + str(otp.get("range", ""))
                 if otp_id in last_otps:
                     continue
                 last_otps.add(otp_id)
                 if len(last_otps) > 300:
                     last_otps.clear()
 
-                num = otp.get("number", "N/A")
+                num = otp.get("range", "N/A")
+                sid = otp.get("sid", "Unknown")
                 msg_text = otp.get("message", "")
-                service_name, service_emoji, service_id = detect_service(msg_text)
+                service_name, service_emoji, service_id = detect_service(sid)
                 otp_code = extract_otp(msg_text)
                 formatted = format_otp_message(num, service_name, service_emoji, service_id, otp_code)
 
@@ -424,6 +427,6 @@ def otp_monitor():
 # ================= 🚀 START =================
 
 if __name__ == "__main__":
-    print("🚀 OTP Live Monitor Bot Started...")
+    print("🚀 Global OTP Monitor Started...")
     threading.Thread(target=otp_monitor, daemon=True).start()
     bot.infinity_polling()
